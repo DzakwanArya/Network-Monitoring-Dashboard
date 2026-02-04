@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Login</title>
+<style>
+body{background:#020617;color:white;font-family:Inter;display:flex;justify-content:center;align-items:center;height:100vh}
+.card{background:#0f172a;padding:30px;border-radius:14px;width:300px}
+input,button{width:100%;padding:10px;margin-top:10px;border-radius:8px;border:none}
+button{background:#38bdf8;font-weight:600}
+.error{color:#ef4444;font-size:13px}
+</style>
+</head>
+
+<body>
+<div class="card">
+<h3>🔐 Login</h3>
+<form method="post">
+<input name="username" placeholder="Username">
+<input type="password" name="password" placeholder="Password">
+<button>Login</button>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+</form>
+</div>
+</body>
+</html>

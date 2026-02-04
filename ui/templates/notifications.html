@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Alert Notifications</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+* {
+    box-sizing: border-box;
+    font-family: 'Inter', sans-serif;
+}
+
+body {
+    margin: 0;
+    background: radial-gradient(circle at top, #0f172a, #020617);
+    color: #e5e7eb;
+}
+
+.container {
+    max-width: 1100px;
+    margin: auto;
+    padding: 28px;
+}
+
+h1 {
+    font-size: 26px;
+    margin-bottom: 6px;
+}
+
+.subtitle {
+    color: #94a3b8;
+    margin-bottom: 22px;
+}
+
+/* ===== CARD ===== */
+.card {
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(14px);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 12px 28px rgba(0,0,0,.35);
+}
+
+/* ===== TABLE ===== */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 12px;
+    font-size: 13px;
+}
+
+th {
+    color: #94a3b8;
+    border-bottom: 1px solid rgba(255,255,255,.12);
+    text-align: left;
+}
+
+td {
+    border-bottom: 1px solid rgba(255,255,255,.06);
+}
+
+/* ===== BADGES ===== */
+.badge {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.badge.up {
+    background: rgba(34,197,94,.15);
+    color: #22c55e;
+}
+
+.badge.down {
+    background: rgba(239,68,68,.15);
+    color: #ef4444;
+}
+
+.badge.latency {
+    background: rgba(250,204,21,.15);
+    color: #facc15;
+}
+
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: #020617;
+    padding: 20px;
+    border-radius: 16px;
+    width: 380px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.6);
+    animation: pop .25s ease;
+}
+
+@keyframes pop {
+    from { transform: scale(.9); opacity:0 }
+    to { transform: scale(1); opacity:1 }
+}
+
+.notif-item {
+    padding: 12px;
+    border-bottom: 1px solid rgba(255,255,255,.1);
+    cursor: pointer;
+}
+
+.notif-item.unread {
+    background: rgba(239,68,68,.08);
+}
+
+.notif-item.read {
+    opacity: .6;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="header">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="display:flex;align-items:center;gap:12px">
+                <h1>🔔 Alert Notifications</h1>
+                <div id="notifBellTop">🔔 <span id="notifCountTop" style="display:none">0</span></div>                <button id="markAllBtn" style="margin-left:12px;padding:6px 10px;border-radius:8px;background:#111827;color:#fff;border:none;cursor:pointer">Mark all as read</button>            </div>
+            <div>
+                <a href="/">Back to Dashboard</a>
+            </div>
+        </div>
+        <div class="subtitle">Daftar semua peringatan dari monitoring network</div>
+    </div>
+
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th>IP Address</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody id="alertTable">
+                <tr>
+                    <td colspan="4" style="text-align:center;color:#94a3b8">
+                        Loading alerts...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<div id="alertModal" class="modal hidden">
+    <div class="modal-content">
+        <button id="closeModal" style="float:right">✖</button>
+        <h3 id="modalTitle"></h3>
+        <p id="modalMessage"></p>
+        <small id="modalTime"></small>
+    </div>
+</div>
+
+
+<script>
+let activeAlertId = null;
+
+async function updateUnreadCount(){
+    try{
+        const r = await fetch('http://127.0.0.1:5001/api/alerts/unread-count');
+        const j = await r.json();
+        const c = document.getElementById('notifCountTop');
+        if(c){
+            if(j.unread && j.unread>0){ c.style.display='inline-block'; c.innerText = j.unread; }
+            else { c.style.display='none'; }
+        }
+    }catch(e){ console.warn('failed unread count',e); }
+}
+
+async function loadAlerts() {
+    const res = await fetch("http://127.0.0.1:5001/api/alerts/");
+    const alerts = await res.json();
+
+    const table = document.getElementById("alertTable");
+    table.innerHTML = "";
+
+    if (alerts.length === 0) {
+        table.innerHTML = `
+            <tr>
+                <td colspan="4" style="text-align:center;color:#94a3b8">
+                    Tidak ada alert 🎉
+                </td>
+            </tr>`;
+        await updateUnreadCount();
+        return;
+    }
+
+    alerts.forEach(a => {
+        let type = "STATUS";
+        let badgeClass = a.status ? a.status.toLowerCase() : '';
+
+        if (a.alert_type === "LATENCY") {
+            type = "LATENCY";
+            badgeClass = "latency";
+        }
+
+        const tr = document.createElement("tr");
+        tr.className = a.read ? "read" : "unread";
+
+        tr.innerHTML = `
+            <td>${a.read? '⚪' : '🔴'} ${a.ip_address}</td>
+            <td><span class="badge ${badgeClass}">${type}</span></td>
+            <td>${a.message || `${a.old_status} → ${a.status}`}</td>
+            <td>${a.created_at}</td>
+        `;
+
+        tr.onclick = async () => {
+            openModal(a);
+            if(!a.read){
+                await fetch(`http://127.0.0.1:5001/api/alerts/${a.id}/read`, { method: 'POST' });
+                a.read = true;
+                tr.className = 'read';
+                await updateUnreadCount();
+            }
+        };
+        table.appendChild(tr);
+    });
+    await updateUnreadCount();
+}
+
+function openModal(alert){
+    activeAlertId = alert.id;
+
+    document.getElementById("modalTitle").innerText = alert.ip_address;
+    document.getElementById("modalMessage").innerText = alert.message;
+    document.getElementById("modalTime").innerText = alert.created_at;
+
+    document.getElementById("alertModal").classList.remove("hidden");
+}
+
+document.getElementById("closeModal").onclick = async () => {
+    document.getElementById("alertModal").classList.add("hidden");
+
+    if(activeAlertId){
+        try{
+            await fetch(`http://127.0.0.1:5001/api/alerts/${activeAlertId}/read`, { method: "POST" });
+        }catch(e){ console.warn('mark read failed',e); }
+        activeAlertId = null;
+        loadAlerts(); // refresh table
+    }
+};
+
+// Mark all as read
+const markBtn = document.getElementById('markAllBtn');
+if(markBtn){
+    markBtn.onclick = async () => {
+        try{
+            await fetch('http://127.0.0.1:5001/api/alerts/read-all', { method: 'POST' });
+            await loadAlerts();
+        }catch(e){ console.warn('mark all failed', e); }
+    };
+}
+
+loadAlerts();
+</script>
+
+
+</body>
+</html>

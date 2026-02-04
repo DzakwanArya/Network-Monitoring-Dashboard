@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Network Monitoring Dashboard</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+* { box-sizing: border-box; font-family: 'Inter', sans-serif; }
+
+body {
+    margin: 0;
+    background: radial-gradient(circle at top, #0f172a, #020617);
+    color: #e5e7eb;
+}
+
+.container {
+    max-width: 1300px;
+    margin: auto;
+    padding: 28px;
+}
+
+h1 { font-size: 26px; margin: 0; }
+.subtitle { color: #94a3b8; margin-bottom: 16px; }
+
+/* HEADER */
+.header {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+}
+
+.header-left {
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+.header-right {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-size:13px;
+    color:#cbd5f5;
+}
+
+.header-right a {
+    color:#ef4444;
+    text-decoration:none;
+    font-weight:600;
+}
+
+.header-right a:hover {
+    text-decoration:underline;
+}
+
+/* GRID */
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.grid-3 { display:grid; grid-template-columns:2fr 1.2fr; gap:18px; margin-top:22px; }
+
+/* CARD */
+.card {
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(14px);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 12px 28px rgba(0,0,0,.35);
+}
+
+.card h3 { margin:0 0 12px; font-size:14px; color:#c7d2fe; }
+
+/* TABLE */
+table { width:100%; border-collapse:collapse; }
+th,td { padding:9px 10px; font-size:13px; }
+th { color:#94a3b8; border-bottom:1px solid rgba(255,255,255,.12); }
+td { border-bottom:1px solid rgba(255,255,255,.06); }
+
+.up { color:#22c55e; }
+.down { color:#ef4444; }
+
+/* LATENCY */
+.latency-bar {
+    height:6px;
+    background:rgba(255,255,255,.12);
+    border-radius:12px;
+    overflow:hidden;
+}
+.latency-fill {
+    height:100%;
+    background:linear-gradient(90deg,#22c55e,#facc15,#ef4444);
+}
+
+/* TAG */
+.tag {
+    padding:3px 8px;
+    border-radius:12px;
+    font-size:11px;
+    font-weight:600;
+}
+.tag.up { background:rgba(34,197,94,.15); color:#22c55e; }
+.tag.down { background:rgba(239,68,68,.15); color:#ef4444; }
+
+/* ALERT BADGE */
+#alertBadge {
+    background:#ef4444;
+    padding:4px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:600;
+    display:none;
+    color:white;
+}
+
+/* FILTER */
+.filters {
+    display:flex;
+    gap:10px;
+    margin:16px 0;
+}
+input, select {
+    background:#020617;
+    border:1px solid rgba(255,255,255,.15);
+    color:white;
+    padding:6px 10px;
+    border-radius:8px;
+}
+
+/* TOAST */
+#toastContainer {
+    position:fixed;
+    top:20px;
+    right:20px;
+    z-index:9999;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+}
+
+.toast {
+    background:rgba(15,23,42,.95);
+    padding:14px 16px;
+    border-radius:12px;
+    border-left:4px solid #ef4444;
+    box-shadow:0 10px 25px rgba(0,0,0,.4);
+    font-size:13px;
+    animation:slide .4s ease;
+}
+
+@keyframes slide {
+    from { opacity:0; transform:translateX(30px); }
+    to { opacity:1; transform:translateX(0); }
+}
+
+/* ============================= */
+/* 🔥 CRITICAL SHAKE ANIMATION 🔥 */
+/* ============================= */
+@keyframes shake {
+    0% { transform: translateX(0); }
+    20% { transform: translateX(-4px); }
+    40% { transform: translateX(4px); }
+    60% { transform: translateX(-3px); }
+    80% { transform: translateX(3px); }
+    100% { transform: translateX(0); }
+}
+
+@keyframes pulse {
+    0% { box-shadow:0 0 0 0 rgba(239,68,68,.6); }
+    70% { box-shadow:0 0 0 10px rgba(239,68,68,0); }
+    100% { box-shadow:0 0 0 0 rgba(239,68,68,0); }
+}
+
+#alertBadge.critical {
+    background:#dc2626;
+    animation: shake .4s ease-in-out infinite,
+               pulse 1.4s infinite;
+}
+
+.toast.critical {
+    border-left-color:#dc2626;
+    animation: shake .35s ease;
+}
+
+/* ============================= */
+/* ✨ HEADER SMOOTH APPEAR ✨ */
+/* ============================= */
+.header {
+    opacity: 0;
+    transform: translateY(-18px);
+    animation: headerReveal .8s ease forwards;
+}
+
+@keyframes headerReveal {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ============================= */
+/* 📡 GLOW + FLOATING TITLE */
+/* ============================= */
+.header-left h1 {
+    position: relative;
+    animation: floatTitle 3.5s ease-in-out infinite;
+    text-shadow:
+        0 0 8px rgba(56,189,248,.45),
+        0 0 16px rgba(56,189,248,.25);
+}
+
+@keyframes floatTitle {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+
+/* ============================= */
+/* 🚨 ALERT BADGE PULSE */
+/* ============================= */
+#alertBadge {
+    animation: alertPulse 2s infinite;
+}
+
+@keyframes alertPulse {
+    0% { box-shadow:0 0 0 0 rgba(239,68,68,.6); }
+    70% { box-shadow:0 0 0 12px rgba(239,68,68,0); }
+    100% { box-shadow:0 0 0 0 rgba(239,68,68,0); }
+}
+
+/* Notification bell */
+.notif-link {
+    display:inline-block;
+    text-decoration:none;
+    color:inherit;
+    margin-right:12px;
+}
+
+#notifBell {
+    background: rgba(255,255,255,.04);
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:14px;
+    color:#94a3b8;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+}
+
+#notifCount {
+    background:#10b981;
+    color:white;
+    padding:2px 6px;
+    border-radius:999px;
+    font-weight:700;
+    font-size:12px;
+}
+
+.notif-link.critical #notifBell {
+    background: rgba(239,68,68,.12);
+    color:#fecaca;
+}
+
+.notif-link.critical #notifCount {
+    background:#ef4444;
+}
+
+/* ============================= */
+/* 🔥 CRITICAL SHAKE OVERRIDE */
+/* ============================= */
+#alertBadge.critical {
+    animation:
+        shake .35s ease-in-out infinite,
+        alertPulse 1.2s infinite;
+}
+
+/* ============================== */
+/* 🌙 DARK / ☀ LIGHT THEME VAR */
+/* ============================== */
+:root {
+    --bg-main: radial-gradient(circle at top, #0f172a, #020617);
+    --bg-card: rgba(255,255,255,0.05);
+    --text-main: #e5e7eb;
+    --text-sub: #94a3b8;
+}
+
+body.light {
+    --bg-main: linear-gradient(180deg,#f8fafc,#e2e8f0);
+    --bg-card: #ffffff;
+    --text-main: #020617;
+    --text-sub: #475569;
+}
+
+body {
+    background: var(--bg-main);
+    color: var(--text-main);
+    transition: background .4s ease, color .3s ease;
+}
+
+.card {
+    background: var(--bg-card);
+    transition: background .3s ease;
+}
+
+.subtitle {
+    color: var(--text-sub);
+}
+
+/* Toggle button */
+.theme-toggle {
+    background:rgba(255,255,255,.12);
+    border:1px solid rgba(255,255,255,.2);
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:13px;
+    cursor:pointer;
+    transition:.25s;
+}
+
+.theme-toggle:hover {
+    background:rgba(255,255,255,.25);
+}
+
+/* ============================== */
+/* 🔔 NOTIFICATION DROPDOWN */
+/* ============================== */
+.notif-dropdown {
+    position:absolute;
+    top:48px;
+    left:0;
+    width:320px;
+    max-height:360px;
+    overflow:auto;
+    background:rgba(15,23,42,.97);
+    border:1px solid rgba(255,255,255,.15);
+    border-radius:14px;
+    box-shadow:0 20px 45px rgba(0,0,0,.6);
+    display:none;
+    z-index:999;
+    animation: fadeDrop .25s ease;
+}
+
+@keyframes fadeDrop {
+    from { opacity:0; transform:translateY(-8px); }
+    to { opacity:1; transform:translateY(0); }
+}
+
+.notif-item {
+    padding:12px 14px;
+    border-bottom:1px solid rgba(255,255,255,.06);
+    font-size:13px;
+}
+
+.notif-item:last-child {
+    border-bottom:none;
+}
+
+.notif-item b {
+    display:block;
+    margin-bottom:2px;
+}
+
+.notif-item small {
+    color:#94a3b8;
+}
+
+.notif-item.critical {
+    background:rgba(239,68,68,.12);
+    border-left:4px solid #dc2626;
+}
+
+.notif-empty {
+    padding:16px;
+    text-align:center;
+    color:#94a3b8;
+    font-size:13px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<!-- HEADER -->
+<div class="header">
+    <div class="header-left">
+        <h1>📡 Network Monitoring</h1>
+        <a href="/notifications" id="notifLink" class="notif-link" title="Notifications">
+            <div id="notifBell">🔔 <span id="notifCount" style="display:none">0</span></div>
+        </a>
+    </div>
+
+    <div class="header-right">
+        {% if user.role == 'ADMIN' %}
+        <button onclick="exportCSV()"
+            style="background:#22c55e;color:white;border:none;
+                   padding:6px 12px;border-radius:10px;
+                   font-size:12px;font-weight:600;cursor:pointer">
+            ⬇ Export CSV
+        </button>
+        {% endif %}
+
+        👤 {{ user.username }}
+        <span style="color:#38bdf8">({{ user.role }})</span>
+        <span>|</span>
+        <a href="/logout">Logout</a>
+    </div>
+</div>
+
+<div class="subtitle">
+    Real-time device status & latency monitoring
+</div>
+
+<!-- FILTER -->
+<div class="filters">
+    <input type="text" id="searchIP" placeholder="Search IP">
+    <select id="filterStatus">
+        <option value="ALL">All Status</option>
+        <option value="UP">UP</option>
+        <option value="DOWN">DOWN</option>
+    </select>
+
+    <select id="scanInterval">
+        <option value="10000">Scan: 10s</option>
+        <option value="30000">Scan: 30s</option>
+        <option value="60000">Scan: 1m</option>
+    </select>
+</div>
+
+<!-- CHART -->
+<div class="grid-2">
+    <div class="card">
+        <h3>Device Status</h3>
+        <canvas id="statusChart"></canvas>
+    </div>
+    <div class="card">
+        <h3>Latency Overview</h3>
+        <canvas id="latencyChart"></canvas>
+    </div>
+</div>
+
+<!-- TABLE -->
+<div class="grid-3">
+    <div class="card">
+        <h3>Devices</h3>
+        <table>
+            <thead>
+                <tr><th>IP</th><th>Status</th><th>Latency</th><th>Last Seen</th></tr>
+            </thead>
+            <tbody id="deviceTable"></tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>History</h3>
+        <table>
+            <thead>
+                <tr><th>IP</th><th>Status</th><th>Time</th></tr>
+            </thead>
+            <tbody id="historyTable"></tbody>
+        </table>
+    </div>
+</div>
+
+</div>
+
+<div id="toastContainer"></div>
+
+<script>
+let statusChart, latencyChart;
+let loadingDevices = false;
+let lastAlertId = null;
+let refreshTimer;
+
+/* ========================= */
+/* ELEMENT INIT (WAJIB DI ATAS) */
+/* ========================= */
+const searchIP=document.getElementById("searchIP");
+const filterStatus=document.getElementById("filterStatus");
+const scanInterval=document.getElementById("scanInterval");
+
+const deviceTable=document.getElementById("deviceTable");
+const historyTable=document.getElementById("historyTable");
+const notifLink=document.getElementById("notifLink");
+const notifCount=document.getElementById("notifCount");
+const toastContainer=document.getElementById("toastContainer");
+
+const statusChartEl=document.getElementById("statusChart");
+const latencyChartEl=document.getElementById("latencyChart");
+
+/* ========================= */
+/* LOAD DEVICE */
+/* ========================= */
+async function fetchWithTimeout(url, opts = {}, timeout = 5000) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Timeout')), timeout);
+        fetch(url, opts).then(res => {
+            clearTimeout(timer);
+            if (!res.ok) return reject(new Error('HTTP ' + res.status));
+            resolve(res);
+        }).catch(e => { clearTimeout(timer); reject(e); });
+    });
+}
+
+async function loadDevices() {
+    if (loadingDevices) {
+        console.log('[UI] loadDevices already running, skipping');
+        return;
+    }
+    loadingDevices = true;
+    console.log('[UI] loadDevices start');
+    try {
+        const res = await fetchWithTimeout("http://127.0.0.1:5001/api/devices?limit=200", {}, 5000);
+        let devices = await res.json();
+
+        const keyword = searchIP.value.toLowerCase();
+        const filter = filterStatus.value;
+
+        devices = devices.filter(d =>
+            d.ip_address.toLowerCase().includes(keyword) &&
+            (filter === "ALL" || d.status === filter)
+        );
+
+        const total = devices.length;
+        const MAX_ROWS = 200; // prevent browser freeze
+        const CHART_POINTS = 50; // limit chart points
+
+        let up=0, down=0, labels=[], latency=[];
+        deviceTable.innerHTML="";
+
+        if (total === 0) {
+            deviceTable.innerHTML = `<tr><td colspan="4">No devices</td></tr>`;
+        } else {
+            // show info if truncated
+            const shown = devices.slice(0, MAX_ROWS);
+            if (total > MAX_ROWS) {
+                deviceTable.innerHTML = `<tr><td colspan="4" style="color:#94a3b8;font-size:12px">Showing ${MAX_ROWS} of ${total} devices (filtered)</td></tr>`;
+            }
+
+            shown.forEach(d=>{
+                d.status==="UP"?up++:down++;
+                // for chart, only take up to CHART_POINTS
+                if (labels.length < CHART_POINTS) {
+                    labels.push(d.ip_address);
+                    latency.push(d.latency_ms||0);
+                }
+
+                deviceTable.innerHTML+=`
+                <tr>
+                    <td>${d.ip_address}</td>
+                    <td class="${d.status.toLowerCase()}">${d.status}</td>
+                    <td>${d.latency_ms ?? "-"} ms
+                        <div class="latency-bar">
+                            <div class="latency-fill"
+                                style="width:${Math.min(d.latency_ms||0,300)/3}%">
+                            </div>
+                        </div>
+                    </td>
+                    <td>${d.last_seen}</td>
+                </tr>`;
+            });
+        }
+
+        renderStatusChart(up,down);
+        renderLatencyChart(labels,latency);
+        console.log(`[UI] loadDevices done (showing ${Math.min(total, MAX_ROWS)} of ${total})`);
+    } catch (e) {
+        console.error('[UI] loadDevices error', e);
+        deviceTable.innerHTML = `<tr><td colspan="4" style="color:#f87171">Error loading devices: ${e.message}</td></tr>`;
+        renderStatusChart(0,0);
+        renderLatencyChart([],[]);
+    } finally {
+        loadingDevices = false;
+    }
+}
+
+/* ========================= */
+/* HISTORY */
+/* ========================= */
+async function loadHistory(){
+    console.log('[UI] loadHistory start');
+    try {
+        const res = await fetchWithTimeout("http://127.0.0.1:5001/api/history", {}, 5000);
+        const data = await res.json();
+        historyTable.innerHTML="";
+        data.slice(0,10).forEach(h=>{
+            historyTable.innerHTML+=`
+            <tr>
+                <td>${h.ip_address}</td>
+                <td><span class="tag ${h.status.toLowerCase()}">${h.status}</span></td>
+                <td>${h.checked_at}</td>
+            </tr>`;
+        });
+        console.log(`[UI] loadHistory done (${data.length})`);
+    } catch (e) {
+        console.error('[UI] loadHistory error', e);
+        historyTable.innerHTML = `<tr><td colspan="3" style="color:#f87171">Error loading history: ${e.message}</td></tr>`;
+    }
+}
+
+/* ========================= */
+/* ALERT + MARK AS READ */
+/* ========================= */
+// dropdown removed - notifications now have dedicated page
+
+async function loadAlerts(){
+    console.log('[UI] loadAlerts start');
+    try {
+        const res = await fetchWithTimeout("http://127.0.0.1:5001/api/alerts/", {}, 4000);
+        const alerts = await res.json();
+
+        // Normalize read/unread flag (support both is_read and read)
+        alerts.forEach(a => {
+            if (a.hasOwnProperty('is_read')) {
+                a._unread = (a.is_read === 0 || a.is_read === false);
+            } else if (a.hasOwnProperty('read')) {
+                a._unread = (a.read === false || a.read === 0);
+            } else {
+                a._unread = false;
+            }
+        });
+
+        const unread = alerts.filter(a => a._unread);
+
+        notifCount.style.display = unread.length ? "inline-block" : "none";
+        notifCount.innerText = unread.length;
+
+        const criticalUnread = unread.some(a =>
+            (a.level==="CRITICAL") || (a.status==="DOWN") || (a._unread && a.status==="DOWN")
+        );
+        if (criticalUnread) notifLink.classList.add('critical'); else notifLink.classList.remove('critical');
+
+        if(unread.length && unread[0].id !== lastAlertId){
+            showToast(unread[0]);
+            lastAlertId = unread[0].id;
+        }
+
+        console.log(`[UI] loadAlerts done (${alerts.length})`);
+    } catch (e) {
+        console.error('[UI] loadAlerts error', e);
+        notifCount.style.display = "none";
+    }
+}
+
+
+
+function showToast(a){
+    const t=document.createElement("div");
+    t.className="toast";
+    if(a.level==="CRITICAL"||a.status==="DOWN")
+        t.classList.add("critical");
+
+    const isUnread = a._unread || (a.hasOwnProperty('is_read') ? a.is_read === 0 : (a.hasOwnProperty('read') ? a.read === false : false));
+
+    t.innerHTML=`
+        <b>${a.ip_address} ${isUnread?'<span style="color:#ef4444">(NEW)</span>':''}</b><br>
+        ${a.message}<br>
+        <small>${a.created_at}</small>
+    `;
+    toastContainer.appendChild(t);
+    setTimeout(()=>t.remove(),6000);
+}
+
+// Clicking the bell navigates to /notifications (default link behavior)
+
+/* ========================= */
+/* CHART */
+/* ========================= */
+function renderStatusChart(up,down){
+    if(statusChart) statusChart.destroy();
+    statusChart=new Chart(statusChartEl,{
+        type:"bar",
+        data:{
+            labels:["UP","DOWN"],
+            datasets:[{
+                data:[up,down],
+                backgroundColor:["#22c55e","#ef4444"]
+            }]
+        },
+        options:{
+            indexAxis:"y",
+            plugins:{legend:{display:false}}
+        }
+    });
+}
+
+
+function renderLatencyChart(l,d){
+    if(latencyChart) latencyChart.destroy();
+    latencyChart=new Chart(latencyChartEl,{
+        type:"line",
+        data:{
+            labels:l,
+            datasets:[{
+                data:d,
+                borderColor:"#38bdf8",
+                backgroundColor:"rgba(56,189,248,.15)",
+                tension:.4,
+                fill:true
+            }]
+        },
+        options:{
+            plugins:{legend:{display:false}}
+        }
+    });
+}
+
+
+/* ========================= */
+/* INTERVAL */
+/* ========================= */
+function startAutoRefresh(interval){
+    clearInterval(refreshTimer);
+    refreshTimer=setInterval(()=>{
+        loadDevices();
+        loadHistory();
+        loadAlerts();
+    },interval);
+}
+
+/* ========================= */
+/* INIT */
+/* ========================= */
+searchIP.oninput=loadDevices;
+filterStatus.onchange=loadDevices;
+scanInterval.onchange=()=>startAutoRefresh(scanInterval.value);
+
+function checkApiHealth(){
+    return fetchWithTimeout("http://127.0.0.1:5001/api/health", {}, 2000)
+        .then(res=>res.json())
+        .then(j=>{
+            if(j.status!=='ok') throw new Error('bad health');
+            console.log('[UI] API health ok');
+        });
+}
+
+checkApiHealth().catch(e=>{
+    console.error('[UI] API health failed', e);
+    toastContainer.innerHTML = `<div class="toast critical">API unreachable: ${e.message}</div>`;
+}).finally(()=>{
+    loadDevices();
+    loadHistory();
+    loadAlerts();
+    startAutoRefresh(10000);
+});
+</script>
+
+
+</body>
+</html>
